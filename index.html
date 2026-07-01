@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Face Recognition — Live Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0E11;
+    --panel:#12161B;
+    --line:#232A31;
+    --text:#E6ECEF;
+    --muted:#7C8791;
+    --accent:#4CE0C7;
+    --accent-dim:#1F3D38;
+    --danger:#FF5D6C;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+  }
+  header{
+    padding:28px 32px 8px;
+  }
+  header h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:1.6rem;
+    margin:0 0 4px;
+    letter-spacing:-0.01em;
+  }
+  header p{
+    margin:0;
+    color:var(--muted);
+    font-size:0.92rem;
+    max-width:640px;
+    line-height:1.5;
+  }
+  main{
+    display:flex;
+    flex-wrap:wrap;
+    gap:24px;
+    padding:24px 32px 48px;
+  }
+  .viewfinder{
+    position:relative;
+    width:640px;
+    max-width:100%;
+    aspect-ratio:4/3;
+    background:#000;
+    border-radius:4px;
+    overflow:hidden;
+    flex-shrink:0;
+  }
+  .viewfinder video, .viewfinder canvas{
+    position:absolute;
+    top:0; left:0;
+    width:100%; height:100%;
+    object-fit:cover;
+  }
+  .bracket{
+    position:absolute;
+    width:28px; height:28px;
+    border:2px solid var(--accent);
+    opacity:0.85;
+    pointer-events:none;
+    z-index:3;
+  }
+  .bracket.tl{top:10px;left:10px;border-right:none;border-bottom:none;}
+  .bracket.tr{top:10px;right:10px;border-left:none;border-bottom:none;}
+  .bracket.bl{bottom:10px;left:10px;border-right:none;border-top:none;}
+  .bracket.br{bottom:10px;right:10px;border-left:none;border-top:none;}
+  .scanline{
+    position:absolute;
+    left:10px; right:10px;
+    height:2px;
+    background:linear-gradient(90deg, transparent, var(--accent), transparent);
+    z-index:2;
+    animation:scan 3.2s ease-in-out infinite;
+    opacity:0.7;
+  }
+  @keyframes scan{
+    0%,100%{top:8%;}
+    50%{top:90%;}
+  }
+  .status-chip{
+    position:absolute;
+    bottom:12px; left:50%;
+    transform:translateX(-50%);
+    background:rgba(10,14,17,0.85);
+    border:1px solid var(--line);
+    color:var(--muted);
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.72rem;
+    padding:5px 12px;
+    border-radius:20px;
+    z-index:4;
+    white-space:nowrap;
+  }
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:20px;
+    width:300px;
+    flex-shrink:0;
+  }
+  .panel h2{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:0.95rem;
+    margin:0 0 14px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+  }
+  button{
+    width:100%;
+    padding:11px 14px;
+    background:var(--accent);
+    color:#08110F;
+    border:none;
+    border-radius:3px;
+    font-family:'Inter',sans-serif;
+    font-weight:500;
+    font-size:0.9rem;
+    cursor:pointer;
+    margin-bottom:8px;
+    transition:opacity 0.15s;
+  }
+  button:hover{opacity:0.88;}
+  button.secondary{
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--text);
+  }
+  button:disabled{opacity:0.4;cursor:not-allowed;}
+  ul#people{
+    list-style:none;
+    margin:14px 0 0;
+    padding:0;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    max-height:220px;
+    overflow-y:auto;
+  }
+  ul#people li{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.82rem;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:8px 10px;
+  }
+  ul#people li button{
+    width:auto;
+    background:transparent;
+    color:var(--danger);
+    border:none;
+    padding:0 4px;
+    margin:0;
+    font-size:0.95rem;
+  }
+  .empty{
+    color:var(--muted);
+    font-size:0.82rem;
+    font-family:'JetBrains Mono',monospace;
+  }
+  .note{
+    margin-top:18px;
+    padding-top:14px;
+    border-top:1px solid var(--line);
+    color:var(--muted);
+    font-size:0.76rem;
+    line-height:1.5;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Face Recognition — Live Demo</h1>
+  <p>Runs entirely in your browser. Nothing is uploaded — enrolled faces and video never leave this device.</p>
+</header>
+
+<main>
+  <div class="viewfinder" id="viewfinder">
+    <video id="video" autoplay muted playsinline></video>
+    <canvas id="overlay"></canvas>
+    <div class="bracket tl"></div>
+    <div class="bracket tr"></div>
+    <div class="bracket bl"></div>
+    <div class="bracket br"></div>
+    <div class="scanline" id="scanline"></div>
+    <div class="status-chip" id="status">loading models…</div>
+  </div>
+
+  <div class="panel">
+    <h2>Enroll</h2>
+    <button id="enrollBtn" disabled>Enroll new face</button>
+    <div class="note" id="enrollHint"></div>
+
+    <h2 style="margin-top:22px;">Enrolled people</h2>
+    <ul id="people"></ul>
+
+    <div class="note">
+      Data is stored only in this browser's local storage. Clearing site data or switching devices/browsers removes it.
+    </div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script>
+const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+const STORAGE_KEY = 'face_recognition_people_v1';
+const MATCH_THRESHOLD = 0.55;
+
+const video = document.getElementById('video');
+const overlay = document.getElementById('overlay');
+const ctx = overlay.getContext('2d');
+const statusChip = document.getElementById('status');
+const enrollBtn = document.getElementById('enrollBtn');
+const enrollHint = document.getElementById('enrollHint');
+const peopleList = document.getElementById('people');
+const scanline = document.getElementById('scanline');
+
+let pendingEnrollName = null;
+
+function loadPeople() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function savePeople(people) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
+}
+
+function renderPeopleList() {
+  const people = loadPeople();
+  peopleList.innerHTML = '';
+  if (people.length === 0) {
+    peopleList.innerHTML = '<li class="empty" style="border:none;background:none;padding:2px 0;">No one enrolled yet</li>';
+    return;
+  }
+  people.forEach((p, idx) => {
+    const li = document.createElement('li');
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = p.name;
+    const delBtn = document.createElement('button');
+    delBtn.textContent = '✕';
+    delBtn.title = 'Remove';
+    delBtn.onclick = () => {
+      const updated = loadPeople().filter((_, i) => i !== idx);
+      savePeople(updated);
+      renderPeopleList();
+    };
+    li.appendChild(nameSpan);
+    li.appendChild(delBtn);
+    peopleList.appendChild(li);
+  });
+}
+
+async function setupCamera() {
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false });
+  video.srcObject = stream;
+  return new Promise((resolve) => {
+    video.onloadedmetadata = () => resolve(video);
+  });
+}
+
+async function loadModels() {
+  await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+  await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+  await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+}
+
+function matchDescriptor(descriptor, people) {
+  let best = { name: 'Unknown', distance: Infinity };
+  for (const p of people) {
+    const distance = faceapi.euclideanDistance(descriptor, p.descriptor);
+    if (distance < best.distance) best = { name: p.name, distance };
+  }
+  if (best.distance > MATCH_THRESHOLD) return { name: 'Unknown', distance: best.distance };
+  return best;
+}
+
+enrollBtn.addEventListener('click', () => {
+  if (pendingEnrollName) return;
+  const name = prompt("Enter this person's name:");
+  if (!name) return;
+  pendingEnrollName = name.trim();
+  enrollHint.textContent = `Look at the camera to enroll "${pendingEnrollName}"…`;
+  enrollBtn.disabled = true;
+});
+
+async function detectLoop() {
+  const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224 });
+  const displaySize = { width: video.videoWidth, height: video.videoHeight };
+  overlay.width = displaySize.width;
+  overlay.height = displaySize.height;
+
+  const detections = await faceapi
+    .detectAllFaces(video, options)
+    .withFaceLandmarks()
+    .withFaceDescriptors();
+
+  const resized = faceapi.resizeResults(detections, displaySize);
+  ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+  const people = loadPeople();
+
+  if (pendingEnrollName && resized.length > 0) {
+    const descriptor = Array.from(resized[0].descriptor);
+    const updated = loadPeople();
+    updated.push({ name: pendingEnrollName, descriptor });
+    savePeople(updated);
+    renderPeopleList();
+    enrollHint.textContent = `Enrolled "${pendingEnrollName}".`;
+    pendingEnrollName = null;
+    enrollBtn.disabled = false;
+    setTimeout(() => { enrollHint.textContent = ''; }, 2500);
+  }
+
+  resized.forEach((det) => {
+    const box = det.detection.box;
+    let label = 'scanning…';
+    let color = '#4CE0C7';
+
+    if (!pendingEnrollName && people.length > 0) {
+      const match = matchDescriptor(det.descriptor, people);
+      label = match.name;
+      color = match.name === 'Unknown' ? '#FF5D6C' : '#4CE0C7';
+    } else if (!pendingEnrollName) {
+      label = 'Unknown';
+      color = '#FF5D6C';
+    }
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(box.x, box.y, box.width, box.height);
+    ctx.font = '13px JetBrains Mono, monospace';
+    const textWidth = ctx.measureText(label).width;
+    ctx.fillStyle = color;
+    ctx.fillRect(box.x, box.y + box.height, textWidth + 12, 20);
+    ctx.fillStyle = '#08110F';
+    ctx.fillText(label, box.x + 6, box.y + box.height + 15);
+  });
+
+  requestAnimationFrame(detectLoop);
+}
+
+(async function init() {
+  try {
+    statusChip.textContent = 'loading models…';
+    await loadModels();
+    statusChip.textContent = 'starting camera…';
+    await setupCamera();
+    statusChip.style.display = 'none';
+    scanline.style.display = 'block';
+    enrollBtn.disabled = false;
+    renderPeopleList();
+    detectLoop();
+  } catch (err) {
+    statusChip.textContent = err.message.includes('Permission')
+      ? 'camera permission denied'
+      : 'error: ' + err.message;
+    console.error(err);
+  }
+})();
+</script>
+
+</body>
+</html>
